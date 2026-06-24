@@ -1,0 +1,20 @@
+[
+  {
+    "name": "Portfolio Company 1",
+    "url": "https://example.com",
+    "description": "Short description of your company, product, or service.",
+    "category": "Technology"
+  },
+  {
+    "name": "Portfolio Company 2",
+    "url": "https://example.org",
+    "description": "Replace this text with original marketing copy for SEO value.",
+    "category": "AI Software"
+  },
+  {
+    "name": "Portfolio Company 3",
+    "url": "https://example.net",
+    "description": "Add a clear, honest description and avoid keyword stuffing.",
+    "category": "Business"
+  }
+]
