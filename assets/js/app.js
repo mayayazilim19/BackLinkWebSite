@@ -1,10 +1,10 @@
-const state = {page:1, perPage:window.NEWS_PER_PAGE||100, filter:'all', query:'', total:0, pages:1};
+const state = {items:[], filtered:[], page:1, perPage:window.NEWS_PER_PAGE||100, filter:'all', source:'', query:''};
 const $      = sel => document.querySelector(sel);
 const fmtDate = d => { try { return new Intl.DateTimeFormat(document.documentElement.lang==='tr'?'tr-TR':'en-US',{dateStyle:'medium',timeStyle:'short'}).format(new Date(d)); } catch(e) { return d||''; } };
 const escapeHtml = s => (s||'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[c]));
 
 function articleCard(item) {
-    const detailUrl = `article.php?id=${encodeURIComponent(item.id||'')}`;
+    const detailUrl = 'article.php?id=' + encodeURIComponent(item.id || '');
     return `<article class="news-card">
   <div class="news-meta">
     <span class="badge">${escapeHtml(item.source)}</span>
@@ -13,60 +13,97 @@ function articleCard(item) {
     <time datetime="${escapeHtml(item.published)}">${fmtDate(item.published)}</time>
   </div>
   <h2><a href="${detailUrl}">${escapeHtml(item.title)}</a></h2>
-  <p>${escapeHtml(item.summary||'Click through to read the full story at the original source.')}</p>
-  <a class="btn" href="${detailUrl}">Read article</a>
-  <a class="btn-ext" href="${escapeHtml(item.url)}" target="_blank" rel="noopener nofollow">Source &nearr;</a>
+  <p>${escapeHtml(item.summary || '')}</p>
+  <a class="btn"     href="${detailUrl}">${t('btn.read')}</a>
+  <a class="btn-ext" href="${escapeHtml(item.url)}" target="_blank" rel="noopener nofollow">${t('btn.src')}</a>
 </article>`;
 }
 
-function renderNews(items) {
+function applyFilters() {
+    const q = state.query.toLowerCase();
+    state.filtered = state.items.filter(i => {
+        if (state.source && i.source !== state.source) return false;
+        if (state.filter !== 'all' && i.language !== state.filter) return false;
+        if (q && !(i.title + ' ' + i.summary + ' ' + i.source + ' ' + i.category).toLowerCase().includes(q)) return false;
+        return true;
+    });
+    state.page = 1;
+    renderNews();
+}
+
+function setSourceFilter(sourceName) {
+    state.source = sourceName;
+    // highlight active source link
+    document.querySelectorAll('.source-link').forEach(a =>
+        a.classList.toggle('source-link--active', a.dataset.source === sourceName)
+    );
+}
+
+function clearSourceFilter() {
+    state.source = '';
+    document.querySelectorAll('.source-link').forEach(a => a.classList.remove('source-link--active'));
+}
+
+function renderNews() {
     const grid = $('#newsGrid');
     if (!grid) return;
-    grid.innerHTML = items.length
-        ? items.map(articleCard).join('')
-        : '<div class="notice">No matching news found. Try a different filter or search term.</div>';
+    const start = (state.page - 1) * state.perPage;
+    const slice = state.filtered.slice(start, start + state.perPage);
+    grid.innerHTML = slice.length
+        ? slice.map(articleCard).join('')
+        : `<div class="notice">${t('noNews')}</div>`;
     renderPagination();
 }
 
 function renderPagination() {
     const el = $('#pagination');
     if (!el) return;
-    if (state.pages <= 1) { el.innerHTML = ''; return; }
-    const win = 5;
-    let start = Math.max(1, state.page - Math.floor(win/2));
-    let end   = Math.min(state.pages, start + win - 1);
-    if (end - start < win - 1) start = Math.max(1, end - win + 1);
+    const pages = Math.max(1, Math.ceil(state.filtered.length / state.perPage));
+    if (pages <= 1) { el.innerHTML = ''; return; }
+
+    const p = state.page;
+    const pageBtn = (n, label, active) =>
+        `<button class="page-btn${active ? ' active' : ''}" data-page="${n}">${label ?? n}</button>`;
+    const ellipsis = '<span class="page-ellipsis">&hellip;</span>';
+
     let html = '';
-    if (state.page > 1)           html += btn(state.page - 1, '&lsaquo; Prev');
-    if (start > 1)                html += btn(1, '1') + (start > 2 ? '<span class="page-ellipsis">&hellip;</span>' : '');
-    for (let i = start; i <= end; i++) html += btn(i, i, i === state.page);
-    if (end < state.pages)        html += (end < state.pages - 1 ? '<span class="page-ellipsis">&hellip;</span>' : '') + btn(state.pages, state.pages);
-    if (state.page < state.pages) html += btn(state.page + 1, 'Next &rsaquo;');
+    if (p > 1) html += pageBtn(p - 1, '‹ Prev');
+    html += pageBtn(1, null, p === 1);
+    if (p > 3) html += ellipsis;
+    for (let i = Math.max(2, p - 1); i <= Math.min(pages - 1, p + 1); i++) html += pageBtn(i, null, i === p);
+    if (p < pages - 2) html += ellipsis;
+    if (pages > 1) html += pageBtn(pages, null, p === pages);
+    if (p < pages) html += pageBtn(p + 1, 'Next ›');
+
     el.innerHTML = html;
     el.querySelectorAll('[data-page]').forEach(b => b.addEventListener('click', () => {
         state.page = parseInt(b.dataset.page, 10);
-        loadNews();
+        renderNews();
         window.scrollTo({top: 0, behavior: 'smooth'});
     }));
-}
-function btn(page, label, active) {
-    return `<button class="page-btn${active?' active':''}" data-page="${page}">${label}</button>`;
 }
 
 async function loadNews() {
     const grid = $('#newsGrid');
-    if (grid) grid.innerHTML = '<div class="notice">Loading news&hellip;</div>';
+    if (grid) grid.innerHTML = `<div class="notice">${t('loading')}</div>`;
     try {
-        const p = new URLSearchParams({page: state.page, limit: state.perPage, lang: state.filter, q: state.query});
-        const data = await fetch(`api/news.php?${p}`).then(r => r.json());
-        state.total = data.total || data.count || 0;
-        state.pages = data.pages || 1;
+        const data = await fetch('api/news.php').then(r => r.json());
+        state.items    = data.items || [];
+        state.filtered = state.items;
         const up = $('#updatedAt');
-        if (up) up.textContent = `Updated: ${fmtDate(data.updated_at)}`;
-        renderNews(data.items || []);
-        renderSources(data.items || []);
+        if (up) up.textContent = t('updated') + ' ' + fmtDate(data.updated_at);
+
+        // Only filter by language if explicitly set via URL param (?lang=tr/en)
+        const urlLang = new URLSearchParams(window.location.search).get('lang');
+        if (urlLang && urlLang !== 'all') {
+            state.filter = urlLang;
+            document.querySelectorAll('.chip').forEach(b =>
+                b.classList.toggle('active', b.dataset.filter === urlLang)
+            );
+        }
+        applyFilters();
     } catch(e) {
-        if (grid) grid.innerHTML = '<div class="notice">News could not be loaded. Check RSS source URLs and PHP settings.</div>';
+        if (grid) grid.innerHTML = '<div class="notice">News could not be loaded. Check RSS source URLs and PHP settings on your host.</div>';
     }
 }
 
@@ -85,43 +122,49 @@ async function loadSponsors() {
     } catch(e) {}
 }
 
-function renderSources(items) {
-    const box = $('#sourceList');
-    if (!box) return;
-    const map = new Map();
-    items.forEach(i => map.set(i.source, {name:i.source, language:i.language, category:i.category}));
-    box.innerHTML = [...map.values()].map(s =>
-        `<li><strong>${escapeHtml(s.name)}</strong><div class="small">${escapeHtml(s.category)} &bull; ${escapeHtml((s.language||'').toUpperCase())}</div></li>`
-    ).join('');
-}
-
-// read ?lang= from URL on page load (used by all-news.php links)
-function langFromUrl() {
-    const p = new URLSearchParams(window.location.search);
-    return p.get('lang') || 'all';
-}
-
-let searchTimer;
 document.addEventListener('DOMContentLoaded', () => {
-    const initLang = langFromUrl();
-    if (initLang !== 'all') {
-        state.filter = initLang;
-        document.querySelectorAll('.chip').forEach(b => {
-            b.classList.toggle('active', b.dataset.filter === initLang);
-        });
-    }
+    // Language chip filters
     document.querySelectorAll('.chip').forEach(btn => btn.addEventListener('click', () => {
         document.querySelectorAll('.chip').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         state.filter = btn.dataset.filter;
-        state.page   = 1;
-        loadNews();
+        clearSourceFilter();
+        applyFilters();
     }));
+
+    // Newspaper source links in left sidebar
+    document.querySelectorAll('.source-link[data-source]').forEach(link => {
+        link.addEventListener('click', e => {
+            e.preventDefault();
+            if (state.source === link.dataset.source) {
+                // clicking active source again → show all
+                clearSourceFilter();
+                state.filter = 'all';
+                document.querySelectorAll('.chip').forEach(b =>
+                    b.classList.toggle('active', b.dataset.filter === 'all')
+                );
+            } else {
+                setSourceFilter(link.dataset.source);
+                // clear language chip selection when browsing by source
+                document.querySelectorAll('.chip').forEach(b => b.classList.remove('active'));
+            }
+            applyFilters();
+            window.scrollTo({top: 0, behavior: 'smooth'});
+        });
+    });
+
+    // Search
     const search = $('#searchInput');
     if (search) search.addEventListener('input', e => {
-        clearTimeout(searchTimer);
-        searchTimer = setTimeout(() => { state.query = e.target.value; state.page = 1; loadNews(); }, 400);
+        state.query = e.target.value;
+        applyFilters();
     });
+
+    // Re-render cards when UI language changes (translation only — don't change news filter)
+    document.addEventListener('siteLangChange', () => {
+        if (state.items.length) applyFilters();
+    });
+
     loadNews();
     loadSponsors();
 });

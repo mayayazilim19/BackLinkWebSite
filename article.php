@@ -3,50 +3,31 @@ $root = __DIR__;
 $id   = trim($_GET['id'] ?? '');
 if (!preg_match('/^[a-f0-9]{32}$/', $id)) { header('Location: index.php'); exit; }
 
-/* ── load article ───────────────────────────────────── */
-$article = null;
-$dbFile  = $root . '/db/database.php';
-if (file_exists($dbFile)) {
-    require_once $dbFile;
-    $db = getDb();
-    if ($db) {
-        $stmt = $db->prepare('SELECT * FROM articles WHERE id = ?');
-        $stmt->execute([$id]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($row) {
-            $row['published'] = (new DateTime($row['published_at']))->format(DATE_ATOM);
-            $article = $row;
-        }
-    }
-}
-if (!$article) {
-    $cacheFile = $root . '/cache/news-cache.json';
-    if (file_exists($cacheFile)) {
-        $data = json_decode(file_get_contents($cacheFile), true);
-        foreach ($data['items'] ?? [] as $item) {
-            if (($item['id'] ?? md5($item['url'] ?? '')) === $id) { $article = $item; break; }
-        }
+$article   = null;
+$cacheFile = $root . '/cache/news-cache.json';
+if (file_exists($cacheFile)) {
+    $data = json_decode(file_get_contents($cacheFile), true);
+    foreach ($data['items'] ?? [] as $item) {
+        if (($item['id'] ?? '') === $id) { $article = $item; break; }
     }
 }
 if (!$article) { header('Location: index.php'); exit; }
 
-/* ── page meta ──────────────────────────────────────── */
-$safeTitle   = htmlspecialchars($article['title']   ?? 'Article', ENT_QUOTES, 'UTF-8');
+$safeTitle   = htmlspecialchars($article['title']   ?? 'Article',   ENT_QUOTES, 'UTF-8');
 $safeSummary = htmlspecialchars(mb_substr(strip_tags($article['summary'] ?? ''), 0, 160, 'UTF-8'), ENT_QUOTES, 'UTF-8');
-$safeUrl     = htmlspecialchars($article['url']     ?? '', ENT_QUOTES, 'UTF-8');
-$safeSource  = htmlspecialchars($article['source']  ?? 'Source', ENT_QUOTES, 'UTF-8');
+$safeUrl     = htmlspecialchars($article['url']     ?? '',           ENT_QUOTES, 'UTF-8');
+$safeSource  = htmlspecialchars($article['source']  ?? 'Source',    ENT_QUOTES, 'UTF-8');
 
 $pageTitle       = $safeTitle . ' | NewsDirectory';
 $pageDescription = $safeSummary;
 $canonical       = 'article.php?id=' . htmlspecialchars($id, ENT_QUOTES, 'UTF-8');
 
-// Schema.org for SEO — injected before </head> via $extraHead
 $schema = json_encode([
     '@context'      => 'https://schema.org',
     '@type'         => 'NewsArticle',
-    'headline'      => $article['title'] ?? '',
+    'headline'      => $article['title']    ?? '',
     'description'   => mb_substr(strip_tags($article['summary'] ?? ''), 0, 250, 'UTF-8'),
-    'url'           => $article['url'] ?? '',
+    'url'           => $article['url']      ?? '',
     'datePublished' => $article['published'] ?? '',
     'publisher'     => ['@type' => 'Organization', 'name' => $article['source'] ?? ''],
     'inLanguage'    => $article['language'] ?? 'en',
@@ -59,16 +40,19 @@ $fmtDate = function(string $d): string {
     try { return (new DateTime($d))->format('d M Y, H:i'); } catch (Exception $e) { return $d; }
 };
 
+// Determine if we have rich body content beyond just the short summary
+$body     = $article['body'] ?? '';
+$hasRich  = $body && mb_strlen(strip_tags($body), 'UTF-8') > mb_strlen($article['summary'] ?? '', 'UTF-8') + 50;
+
 include 'header.php';
 ?>
-
 <main class="wrap layout">
   <?php include 'sidebar-left.php'; ?>
 
   <section class="main-col">
     <nav class="breadcrumb" aria-label="Breadcrumb">
-      <a href="index.php">Home</a> &rsaquo;
-      <a href="all-news.php">All News</a> &rsaquo;
+      <a href="index.php" data-i18n="art.home">Home</a> &rsaquo;
+      <a href="all-news.php" data-i18n="art.allNews">All News</a> &rsaquo;
       <span><?= $safeSource ?></span>
     </nav>
 
@@ -88,29 +72,37 @@ include 'header.php';
           </time>
         </div>
         <h1 itemprop="headline"><?= $safeTitle ?></h1>
+
+        <!-- Prominent link to original article — always visible at the top -->
+        <a class="source-visit-btn" href="<?= $safeUrl ?>" target="_blank" rel="noopener nofollow">
+          <span data-i18n="art.cta.btn">Read Full Article</span> at <?= $safeSource ?> &rarr;
+        </a>
       </header>
 
-      <?php if (!empty($article['content'])): ?>
-        <div class="article-content" itemprop="articleBody">
-          <?= $article['content'] /* already sanitized server-side */ ?>
+      <?php if ($hasRich): ?>
+        <!-- Full article body from RSS content:encoded -->
+        <div class="article-body" itemprop="articleBody">
+          <?= $body ?>
         </div>
-      <?php elseif (!empty($article['summary'])): ?>
-        <div class="article-summary" itemprop="description">
-          <?= nl2br(htmlspecialchars($article['summary'], ENT_QUOTES, 'UTF-8')) ?>
+      <?php elseif ($body): ?>
+        <!-- RSS description (only content available) -->
+        <div class="article-body" itemprop="description">
+          <?= $body ?>
         </div>
       <?php endif; ?>
 
+      <!-- Bottom CTA — link back to original -->
       <div class="article-cta">
-        <p class="small">This is the RSS summary. Read the complete story at the original publisher:</p>
+        <p class="small" data-i18n="art.cta.text">This content is sourced from the RSS feed. For the complete article visit the original publisher:</p>
         <a class="btn btn-lg" href="<?= $safeUrl ?>" target="_blank" rel="noopener nofollow">
-          Read Full Article at <?= $safeSource ?> &rarr;
+          <span data-i18n="art.cta.btn">Read Full Article</span> at <?= $safeSource ?> &rarr;
         </a>
       </div>
 
       <div class="article-nav">
-        <a href="javascript:history.back()" class="back-link">&larr; Back</a>
-        <a href="index.php" class="back-link">Home</a>
-        <a href="all-news.php" class="back-link">All News</a>
+        <a href="javascript:history.back()" class="back-link" data-i18n="art.back">&larr; Back</a>
+        <a href="index.php"    class="back-link" data-i18n="art.home">Home</a>
+        <a href="all-news.php" class="back-link" data-i18n="art.allNews">All News</a>
       </div>
 
     </article>
@@ -120,12 +112,10 @@ include 'header.php';
 </main>
 
 <script>
-/* minimal JS: sidebars only — no full news load needed on this page */
 const escapeHtml = s => (s||'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[c]));
 async function loadSponsors() {
     try {
-        const res = await fetch('api/sponsors.php');
-        const sponsors = await res.json();
+        const sponsors = await fetch('api/sponsors.php').then(r => r.json());
         document.querySelectorAll('[data-sponsors]').forEach(slot => {
             slot.innerHTML = sponsors.map(s =>
                 `<a class="sponsor-card" href="${escapeHtml(s.url)}" target="_blank" rel="sponsored noopener">

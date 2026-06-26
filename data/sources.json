@@ -1,10 +1,10 @@
 [
-  {"name":"Habertürk",          "language":"tr","category":"Türkiye",  "feed":"https://www.haberturk.com/rss/anasayfa"},
-  {"name":"Sözcü - Son Dakika", "language":"tr","category":"Türkiye",  "feed":"https://www.sozcu.com.tr/feeds-son-dakika"},
-  {"name":"Sabah",              "language":"tr","category":"Türkiye",  "feed":"https://www.sabah.com.tr/rss/anasayfa.xml"},
-  {"name":"Milliyet",           "language":"tr","category":"Türkiye",  "feed":"https://www.milliyet.com.tr/rss/rssNew/gundemRss.xml"},
-  {"name":"Hürriyet",           "language":"tr","category":"Türkiye",  "feed":"https://www.hurriyet.com.tr/rss/anasayfa"},
-  {"name":"Posta",              "language":"tr","category":"Türkiye",  "feed":"https://www.posta.com.tr/rss/anasayfa.xml"},
-  {"name":"BBC World",          "language":"en","category":"World",    "feed":"https://feeds.bbci.co.uk/news/world/rss.xml"},
-  {"name":"BBC Business",       "language":"en","category":"Business", "feed":"https://feeds.bbci.co.uk/news/business/rss.xml"}
+  {"name":"Habertürk",          "language":"tr","category":"Türkiye",  "website":"https://www.haberturk.com",          "feed":"https://www.haberturk.com/rss/anasayfa"},
+  {"name":"Sözcü",              "language":"tr","category":"Türkiye",  "website":"https://www.sozcu.com.tr",           "feed":"https://www.sozcu.com.tr/feeds-son-dakika"},
+  {"name":"Sabah",              "language":"tr","category":"Türkiye",  "website":"https://www.sabah.com.tr",           "feed":"https://www.sabah.com.tr/rss/anasayfa.xml"},
+  {"name":"Milliyet",           "language":"tr","category":"Türkiye",  "website":"https://www.milliyet.com.tr",        "feed":"https://www.milliyet.com.tr/rss/rssNew/gundemRss.xml"},
+  {"name":"Hürriyet",           "language":"tr","category":"Türkiye",  "website":"https://www.hurriyet.com.tr",        "feed":"https://www.hurriyet.com.tr/rss/anasayfa"},
+  {"name":"Posta",              "language":"tr","category":"Türkiye",  "website":"https://www.posta.com.tr",           "feed":"https://www.posta.com.tr/rss/anasayfa.xml"},
+  {"name":"BBC World",          "language":"en","category":"World",    "website":"https://www.bbc.com/news/world",     "feed":"https://feeds.bbci.co.uk/news/world/rss.xml"},
+  {"name":"BBC Business",       "language":"en","category":"Business", "website":"https://www.bbc.com/news/business",  "feed":"https://feeds.bbci.co.uk/news/business/rss.xml"}
 ]
